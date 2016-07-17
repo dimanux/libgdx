@@ -47,6 +47,11 @@ import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.GdxRuntimeException;
 import com.badlogic.gdx.utils.Json;
+import com.badlogic.gdx.utils.JsonWriter;
+import com.badlogic.gdx.utils.JsonWriter.OutputType;
+import com.badlogic.gdx.utils.JsonReader;
+import com.badlogic.gdx.utils.JsonValue;
+import com.badlogic.gdx.utils.JsonValue.ValueType;
 
 /** @author Nathan Sweet */
 public class TexturePacker {
@@ -285,65 +290,44 @@ public class TexturePacker {
 		File packDir = packFile.getParentFile();
 		packDir.mkdirs();
 
-		if (packFile.exists()) {
-			// Make sure there aren't duplicate names.
-			TextureAtlasData textureAtlasData = new TextureAtlasData(new FileHandle(packFile), new FileHandle(packFile), false);
-			for (Page page : pages) {
-				for (Rect rect : page.outputRects) {
-					String rectName = Rect.getAtlasName(rect.name, settings.flattenPaths);
-					for (Region region : textureAtlasData.getRegions()) {
-						if (region.name.equals(rectName)) {
-							throw new GdxRuntimeException("A region with the name \"" + rectName + "\" has already been packed: "
-								+ rect.name);
-						}
-					}
-				}
-			}
-		}
-
-		Writer writer = new OutputStreamWriter(new FileOutputStream(packFile, true), "UTF-8");
+		JsonValue fileJson = new JsonValue(ValueType.object);
+		
 		for (Page page : pages) {
-			writer.write("\n" + page.imageName + "\n");
-			writer.write("size: " + page.imageWidth + "," + page.imageHeight + "\n");
-			writer.write("format: " + settings.format + "\n");
-			writer.write("filter: " + settings.filterMin + "," + settings.filterMag + "\n");
-			writer.write("repeat: " + getRepeatValue() + "\n");
-
+			JsonValue pageJson = new JsonValue(ValueType.object);
+			fileJson.addChild(page.imageName, pageJson);
+			pageJson.addChild("w", new JsonValue(page.imageWidth));
+			pageJson.addChild("h", new JsonValue(page.imageHeight));
+			JsonValue regionsJson = new JsonValue(ValueType.object);
+			pageJson.addChild("rs", regionsJson);
 			page.outputRects.sort();
 			for (Rect rect : page.outputRects) {
-				writeRect(writer, page, rect, rect.name);
+				JsonValue rectJson = new JsonValue(ValueType.object);
+				regionsJson.addChild(Rect.getAtlasName(rect.name, settings.flattenPaths), rectJson);
+				rectJson.addChild("x", new JsonValue(page.x + rect.x));
+				rectJson.addChild("y", new JsonValue(page.y + page.height - rect.height - rect.y));
+				rectJson.addChild("w", new JsonValue(rect.regionWidth));
+				rectJson.addChild("h", new JsonValue(rect.regionHeight));
 				Array<Alias> aliases = new Array(rect.aliases.toArray());
 				aliases.sort();
 				for (Alias alias : aliases) {
 					Rect aliasRect = new Rect();
 					aliasRect.set(rect);
 					alias.apply(aliasRect);
-					writeRect(writer, page, aliasRect, alias.name);
+					JsonValue aliasJson = new JsonValue(ValueType.object);
+					regionsJson.addChild(Rect.getAtlasName(alias.name, settings.flattenPaths), aliasJson);
+					aliasJson.addChild("x", new JsonValue(page.x + aliasRect.x));
+					aliasJson.addChild("y", new JsonValue(page.y + page.height - aliasRect.height - aliasRect.y));
+					aliasJson.addChild("w", new JsonValue(aliasRect.regionWidth));
+					aliasJson.addChild("h", new JsonValue(aliasRect.regionHeight));
 				}
 			}
 		}
+
+		Writer writer = new OutputStreamWriter(new FileOutputStream(packFile, false), "UTF-8");
+		writer.write(fileJson.prettyPrint(OutputType.json, 4));
 		writer.close();
 	}
-
-	private void writeRect (Writer writer, Page page, Rect rect, String name) throws IOException {
-		writer.write(Rect.getAtlasName(name, settings.flattenPaths) + "\n");
-		writer.write("  rotate: " + rect.rotated + "\n");
-		writer.write("  xy: " + (page.x + rect.x) + ", " + (page.y + page.height - rect.height - rect.y) + "\n");
-
-		writer.write("  size: " + rect.regionWidth + ", " + rect.regionHeight + "\n");
-		if (rect.splits != null) {
-			writer.write("  split: " //
-				+ rect.splits[0] + ", " + rect.splits[1] + ", " + rect.splits[2] + ", " + rect.splits[3] + "\n");
-		}
-		if (rect.pads != null) {
-			if (rect.splits == null) writer.write("  split: 0, 0, 0, 0\n");
-			writer.write("  pad: " + rect.pads[0] + ", " + rect.pads[1] + ", " + rect.pads[2] + ", " + rect.pads[3] + "\n");
-		}
-		writer.write("  orig: " + rect.originalWidth + ", " + rect.originalHeight + "\n");
-		writer.write("  offset: " + rect.offsetX + ", " + (rect.originalHeight - rect.regionHeight - rect.offsetY) + "\n");
-		writer.write("  index: " + rect.index + "\n");
-	}
-
+	
 	private String getRepeatValue () {
 		if (settings.wrapX == TextureWrap.Repeat && settings.wrapY == TextureWrap.Repeat) return "xy";
 		if (settings.wrapX == TextureWrap.Repeat && settings.wrapY == TextureWrap.ClampToEdge) return "x";

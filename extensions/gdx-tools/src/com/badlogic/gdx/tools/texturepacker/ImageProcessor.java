@@ -80,10 +80,6 @@ public class ImageProcessor {
 			name = name.substring(rootPath.length());
 		}
 
-		// Strip extension.
-		int dotIndex = name.lastIndexOf('.');
-		if (dotIndex != -1) name = name.substring(0, dotIndex);
-
 		Rect rect = addImage(image, name);
 		if (rect != null && settings.limitMemory) rect.unloadImage(file);
 	}

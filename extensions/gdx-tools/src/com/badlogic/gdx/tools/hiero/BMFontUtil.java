@@ -45,6 +45,14 @@ import com.badlogic.gdx.tools.hiero.unicodefont.GlyphPage;
 import com.badlogic.gdx.tools.hiero.unicodefont.UnicodeFont;
 import com.badlogic.gdx.utils.IntIntMap;
 
+import java.io.Writer;
+import java.io.OutputStreamWriter;
+import com.badlogic.gdx.utils.JsonWriter;
+import com.badlogic.gdx.utils.JsonWriter.OutputType;
+import com.badlogic.gdx.utils.JsonReader;
+import com.badlogic.gdx.utils.JsonValue;
+import com.badlogic.gdx.utils.JsonValue.ValueType;
+
 /** @author Nathan Sweet */
 public class BMFontUtil {
 	private final UnicodeFont unicodeFont;
@@ -56,25 +64,25 @@ public class BMFontUtil {
 	public void save (File outputBMFontFile) throws IOException {
 		File outputDir = outputBMFontFile.getParentFile();
 		String outputName = outputBMFontFile.getName();
-		if (outputName.endsWith(".fnt")) outputName = outputName.substring(0, outputName.length() - 4);
-
+		int dotIndex = outputName.lastIndexOf('.');
+		if (dotIndex != -1) outputName = outputName.substring(0, dotIndex);
+		
 		// Always include space and the missing gyph.
 		getGlyph(' ');
 		getGlyph('\u0000');
 		unicodeFont.loadGlyphs();
-
-		PrintStream out = new PrintStream(new FileOutputStream(new File(outputDir, outputName + ".fnt")));
+		
 		Font font = unicodeFont.getFont();
 		int pageWidth = unicodeFont.getGlyphPageWidth();
 		int pageHeight = unicodeFont.getGlyphPageHeight();
-		out.println("info face=\"" + font.getFontName() + "\" size=" + font.getSize() + " bold=" + (font.isBold() ? 1 : 0)
-			+ " italic=" + (font.isItalic() ? 1 : 0) + " charset=\"\" unicode=0 stretchH=100 smooth=1 aa=1 padding="
-			+ unicodeFont.getPaddingTop() + "," + unicodeFont.getPaddingLeft() + "," + unicodeFont.getPaddingBottom() + ","
-			+ unicodeFont.getPaddingRight() + " spacing=" + unicodeFont.getPaddingAdvanceX() + ","
-			+ unicodeFont.getPaddingAdvanceY());
-		out.println("common lineHeight=" + unicodeFont.getLineHeight() + " base=" + unicodeFont.getAscent() + " scaleW=" + pageWidth
-			+ " scaleH=" + pageHeight + " pages=" + unicodeFont.getGlyphPages().size() + " packed=0");
-
+		
+		JsonValue fileJson = new JsonValue(ValueType.object);
+		fileJson.addChild("pageWidth", new JsonValue(unicodeFont.getGlyphPageWidth()));
+		fileJson.addChild("pageHeight", new JsonValue(unicodeFont.getGlyphPageHeight()));
+		fileJson.addChild("lineHeight", new JsonValue(unicodeFont.getLineHeight()));
+		JsonValue pagesJson = new JsonValue(ValueType.object);
+		fileJson.addChild("pages", pagesJson);
+		
 		int pageIndex = 0, glyphCount = 0;
 		for (Iterator pageIter = unicodeFont.getGlyphPages().iterator(); pageIter.hasNext();) {
 			GlyphPage page = (GlyphPage)pageIter.next();
@@ -83,78 +91,27 @@ public class BMFontUtil {
 				fileName = outputName + ".png";
 			else
 				fileName = outputName + (pageIndex + 1) + ".png";
-			out.println("page id=" + pageIndex + " file=\"" + fileName + "\"");
-			glyphCount += page.getGlyphs().size();
-			pageIndex++;
-		}
-
-		out.println("chars count=" + glyphCount);
-
-		pageIndex = 0;
-		List allGlyphs = new ArrayList(512);
-		for (Iterator pageIter = unicodeFont.getGlyphPages().iterator(); pageIter.hasNext();) {
-			GlyphPage page = (GlyphPage)pageIter.next();
+			JsonValue pageJson = new JsonValue(ValueType.object);
+			pagesJson.addChild(fileName, pageJson);
 			List<Glyph> glyphs = page.getGlyphs();
-			Collections.sort(glyphs, new Comparator<Glyph>() {
-				public int compare (Glyph o1, Glyph o2) {
-					return o1.getCodePoint() - o2.getCodePoint();
-				}
-			});
 			for (Iterator glyphIter = page.getGlyphs().iterator(); glyphIter.hasNext();) {
 				Glyph glyph = (Glyph)glyphIter.next();
-				writeGlyph(out, pageWidth, pageHeight, pageIndex, glyph);
+				JsonValue glyphJson = new JsonValue(ValueType.object);
+				pageJson.addChild(String.valueOf(glyph.getCodePoint()), glyphJson);
+				glyphJson.addChild("x", new JsonValue((int)(glyph.getU() * pageWidth)));
+				glyphJson.addChild("y", new JsonValue((int)(glyph.getV() * pageHeight)));
+				glyphJson.addChild("w", new JsonValue(glyph.getWidth()));
+				glyphJson.addChild("h", new JsonValue(glyph.getHeight()));
+				glyphJson.addChild("xo", new JsonValue(glyph.getXOffset()));
+				glyphJson.addChild("yo", new JsonValue(glyph.getYOffset()));
+				glyphJson.addChild("xa", new JsonValue(glyph.getXAdvance()));
 			}
-			allGlyphs.addAll(page.getGlyphs());
 			pageIndex++;
 		}
 
-		String ttfFileRef = unicodeFont.getFontFile();
-		if (ttfFileRef == null)
-			System.out.println("Kerning information could not be output because a TTF font file was not specified.");
-		else {
-			Kerning kerning = new Kerning();
-			try {
-				kerning.load(Gdx.files.internal(ttfFileRef).read(), font.getSize());
-			} catch (IOException ex) {
-				System.out.println("Unable to read kerning information from font: " + ttfFileRef);
-				ex.printStackTrace();
-			}
-
-			IntIntMap glyphCodeToCodePoint = new IntIntMap();
-			for (Iterator iter = allGlyphs.iterator(); iter.hasNext();) {
-				Glyph glyph = (Glyph)iter.next();
-				glyphCodeToCodePoint.put(new Integer(getGlyphCode(font, glyph.getCodePoint())), new Integer(glyph.getCodePoint()));
-			}
-
-			List kernings = new ArrayList(256);
-			class KerningPair {
-				public int firstCodePoint, secondCodePoint, offset;
-			}
-			for (IntIntMap.Entry entry : kerning.getKernings()) {
-				int firstGlyphCode = entry.key >> 16;
-				int secondGlyphCode = entry.key & 0xffff;
-				int offset = entry.value;
-				int firstCodePoint = glyphCodeToCodePoint.get(firstGlyphCode, -1);
-				int secondCodePoint = glyphCodeToCodePoint.get(secondGlyphCode, -1);
-
-				if (firstCodePoint == -1 || secondCodePoint == -1 || offset == 0) {
-					// We are not outputting one or both of these glyphs, or the offset is zero anyway.
-					continue;
-				}
-
-				KerningPair pair = new KerningPair();
-				pair.firstCodePoint = firstCodePoint;
-				pair.secondCodePoint = secondCodePoint;
-				pair.offset = offset;
-				kernings.add(pair);
-			}
-			out.println("kernings count=" + kernings.size());
-			for (Iterator iter = kernings.iterator(); iter.hasNext();) {
-				KerningPair pair = (KerningPair)iter.next();
-				out.println("kerning first=" + pair.firstCodePoint + " second=" + pair.secondCodePoint + " amount=" + pair.offset);
-			}
-		}
-		out.close();
+		Writer writer = new OutputStreamWriter(new FileOutputStream(outputBMFontFile, false), "UTF-8");
+		writer.write(fileJson.prettyPrint(OutputType.json, 4));
+		writer.close();
 
 		int width = unicodeFont.getGlyphPageWidth();
 		int height = unicodeFont.getGlyphPageHeight();
