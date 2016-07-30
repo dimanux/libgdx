@@ -98,8 +98,12 @@ public class TexturePacker {
 	}
 
 	public void pack (File outputDir, String packFileName) {
-		if (packFileName.endsWith(settings.atlasExtension))
-			packFileName = packFileName.substring(0, packFileName.length() - settings.atlasExtension.length());
+		String extension = ".atlas";
+		int dotIndex = packFileName.lastIndexOf('.');
+		if (dotIndex != -1) {
+			extension = packFileName.substring(dotIndex);
+			packFileName = packFileName.substring(0, dotIndex);
+		}
 		outputDir.mkdirs();
 
 		for (int i = 0, n = settings.scale.length; i < n; i++) {
@@ -116,7 +120,7 @@ public class TexturePacker {
 			String scaledPackFileName = settings.getScaledPackFileName(packFileName, i);
 			writeImages(outputDir, scaledPackFileName, pages);
 			try {
-				writePackFile(outputDir, scaledPackFileName, pages);
+				writePackFile(outputDir, scaledPackFileName + extension, pages);
 			} catch (IOException ex) {
 				throw new RuntimeException("Error writing pack file.", ex);
 			}
@@ -286,7 +290,7 @@ public class TexturePacker {
 	}
 
 	private void writePackFile (File outputDir, String scaledPackFileName, Array<Page> pages) throws IOException {
-		File packFile = new File(outputDir, scaledPackFileName + settings.atlasExtension);
+		File packFile = new File(outputDir, scaledPackFileName);
 		File packDir = packFile.getParentFile();
 		packDir.mkdirs();
 
@@ -539,7 +543,6 @@ public class TexturePacker {
 		public boolean grid;
 		public float[] scale = {1};
 		public String[] scaleSuffix = {""};
-		public String atlasExtension = ".atlas";
 
 		public Settings () {
 		}
@@ -580,7 +583,6 @@ public class TexturePacker {
 			grid = settings.grid;
 			scale = settings.scale;
 			scaleSuffix = settings.scaleSuffix;
-			atlasExtension = settings.atlasExtension;
 		}
 
 		public String getScaledPackFileName (String packFileName, int scaleIndex) {
@@ -635,7 +637,6 @@ public class TexturePacker {
 		// Check against the only file we know for sure will exist and will be changed if any asset changes:
 		// the atlas file
 		packFullFileName += packFileName;
-		packFullFileName += settings.atlasExtension;
 		File outputFile = new File(packFullFileName);
 
 		if (!outputFile.exists()) {

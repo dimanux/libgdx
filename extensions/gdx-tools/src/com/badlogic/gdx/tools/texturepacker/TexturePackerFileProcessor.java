@@ -47,9 +47,6 @@ public class TexturePackerFileProcessor extends FileProcessor {
 
 	public TexturePackerFileProcessor (Settings defaultSettings, String packFileName) {
 		this.defaultSettings = defaultSettings;
-
-		if (packFileName.toLowerCase().endsWith(defaultSettings.atlasExtension.toLowerCase()))
-			packFileName = packFileName.substring(0, packFileName.length() - defaultSettings.atlasExtension.length());
 		this.packFileName = packFileName;
 
 		setFlattenOutput(true);

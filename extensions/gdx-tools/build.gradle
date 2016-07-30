@@ -2,6 +2,7 @@ project.ext.particles2DMainClass = "com.badlogic.gdx.tools.particleeditor.Partic
 project.ext.particles3DMainClass = "com.badlogic.gdx.tools.flame.FlameMain"
 project.ext.hieroMainClass = "com.badlogic.gdx.tools.hiero.Hiero"
 project.ext.texturePackerMainClass = "com.badlogic.gdx.tools.texturepacker.TexturePacker"
+project.ext.audioSpriteMainClass = "com.badlogic.gdx.tools.audiosprite.AudioSprite"
 
 project.ext.toolsAssetsDir = ["assets"]
 
@@ -61,6 +62,20 @@ task distTexturePacker (type: Jar) {
     }
 }
 
-task buildRunnables (dependsOn: [classes, dist2DParticles, dist3DParticles, distHiero, distTexturePacker]) << {
+task distAudioSprite (type: Jar) {
+    from files(sourceSets.main.output.classesDir)
+    from files(sourceSets.main.output.resourcesDir)
+    from {configurations.compile.collect {zipTree(it)}}
+    from files(project.toolsAssetsDir);
+
+    baseName = "runnable-audiosprite"
+    version = ""
+
+    manifest {
+        attributes 'Main-Class': project.audioSpriteMainClass
+    }
+}
+
+task buildRunnables (dependsOn: [classes, dist2DParticles, dist3DParticles, distHiero, distTexturePacker, distAudioSprite]) << {
     println "Building ye runnables"
 }
