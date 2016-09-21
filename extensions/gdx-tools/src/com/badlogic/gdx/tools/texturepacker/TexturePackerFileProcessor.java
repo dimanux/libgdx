@@ -27,6 +27,7 @@ import com.badlogic.gdx.utils.ObjectSet;
 import java.io.File;
 import java.io.FileReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.regex.Matcher;
@@ -210,8 +211,12 @@ public class TexturePackerFileProcessor extends FileProcessor {
 		// Pack.
 		if (!settings.silent) System.out.println(inputDir.inputFile.getName());
 		TexturePacker packer = new TexturePacker(root, settings);
-		for (Entry file : files)
-			packer.addImage(file.inputFile);
+		ArrayList<String> ignoreList = new ArrayList<String>(Arrays.asList(settings.ignore));
+		for (Entry file : files) {
+			if (!ignoreList.contains(file.inputFile.getName())) {
+				packer.addImage(file.inputFile);
+			}
+		}
 		packer.pack(inputDir.outputDir, packFileName);
 	}
 }
