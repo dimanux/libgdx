@@ -629,13 +629,13 @@ public class Hiero extends JFrame {
 			public void actionPerformed (ActionEvent evt) {
 				FileDialog dialog = new FileDialog(Hiero.this, "Save BMFont files", FileDialog.SAVE);
 				dialog.setLocationRelativeTo(null);
-				dialog.setFile("*.fnt");
+				dialog.setFile("*.json");
 				dialog.setDirectory(prefs.get("dir.savebm", ""));
 
 				if (lastSaveBMFilename.length() > 0) {
 					dialog.setFile(lastSaveBMFilename);
 				} else if (lastOpenFilename.length() > 0) {
-					dialog.setFile(lastOpenFilename.replace(".hiero", ".fnt"));
+					dialog.setFile(lastOpenFilename.replace(".hiero", ".json"));
 				}
 
 				dialog.setVisible(true);

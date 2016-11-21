@@ -79,6 +79,7 @@ public class BMFontUtil {
 		JsonValue fileJson = new JsonValue(ValueType.object);
 		fileJson.addChild("pageWidth", new JsonValue(unicodeFont.getGlyphPageWidth()));
 		fileJson.addChild("pageHeight", new JsonValue(unicodeFont.getGlyphPageHeight()));
+		fileJson.addChild("base", new JsonValue(unicodeFont.getAscent()));
 		fileJson.addChild("lineHeight", new JsonValue(unicodeFont.getLineHeight()));
 		JsonValue pagesJson = new JsonValue(ValueType.object);
 		fileJson.addChild("pages", pagesJson);
