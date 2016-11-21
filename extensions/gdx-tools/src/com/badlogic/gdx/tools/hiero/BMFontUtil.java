@@ -79,10 +79,54 @@ public class BMFontUtil {
 		JsonValue fileJson = new JsonValue(ValueType.object);
 		fileJson.addChild("pageWidth", new JsonValue(unicodeFont.getGlyphPageWidth()));
 		fileJson.addChild("pageHeight", new JsonValue(unicodeFont.getGlyphPageHeight()));
-		fileJson.addChild("base", new JsonValue(unicodeFont.getAscent()));
 		fileJson.addChild("lineHeight", new JsonValue(unicodeFont.getLineHeight()));
 		JsonValue pagesJson = new JsonValue(ValueType.object);
 		fileJson.addChild("pages", pagesJson);
+		
+		List allGlyphs = new ArrayList(512);
+		for (Iterator pageIter = unicodeFont.getGlyphPages().iterator(); pageIter.hasNext();) {
+			GlyphPage page = (GlyphPage)pageIter.next();
+			allGlyphs.addAll(page.getGlyphs());
+		}
+		List kernings = new ArrayList(256);
+		class KerningPair {
+			public int firstCodePoint, secondCodePoint, offset;
+		}
+		if (unicodeFont.getFontFile() != null) {
+			String ttfFileRef = unicodeFont.getFontFile();
+			Kerning kerning = new Kerning();
+			try {
+				kerning.load(Gdx.files.internal(ttfFileRef).read(), font.getSize());
+			} catch (IOException ex) {
+				System.out.println("Unable to read kerning information from font: " + ttfFileRef);
+				ex.printStackTrace();
+			}
+
+			IntIntMap glyphCodeToCodePoint = new IntIntMap();
+			for (Iterator iter = allGlyphs.iterator(); iter.hasNext();) {
+				Glyph glyph = (Glyph)iter.next();
+				glyphCodeToCodePoint.put(new Integer(getGlyphCode(font, glyph.getCodePoint())), new Integer(glyph.getCodePoint()));
+			}
+
+			for (IntIntMap.Entry entry : kerning.getKernings()) {
+				int firstGlyphCode = entry.key >> 16;
+				int secondGlyphCode = entry.key & 0xffff;
+				int offset = entry.value;
+				int firstCodePoint = glyphCodeToCodePoint.get(firstGlyphCode, -1);
+				int secondCodePoint = glyphCodeToCodePoint.get(secondGlyphCode, -1);
+
+				if (firstCodePoint == -1 || secondCodePoint == -1 || offset == 0) {
+					// We are not outputting one or both of these glyphs, or the offset is zero anyway.
+					continue;
+				}
+
+				KerningPair pair = new KerningPair();
+				pair.firstCodePoint = firstCodePoint;
+				pair.secondCodePoint = secondCodePoint;
+				pair.offset = offset;
+				kernings.add(pair);
+			}
+		}
 		
 		int pageIndex = 0, glyphCount = 0;
 		for (Iterator pageIter = unicodeFont.getGlyphPages().iterator(); pageIter.hasNext();) {
@@ -106,6 +150,16 @@ public class BMFontUtil {
 				glyphJson.addChild("xo", new JsonValue(glyph.getXOffset()));
 				glyphJson.addChild("yo", new JsonValue(glyph.getYOffset()));
 				glyphJson.addChild("xa", new JsonValue(glyph.getXAdvance()));
+				JsonValue kerningsJson = new JsonValue(ValueType.object);
+				for (Iterator iter = kernings.iterator(); iter.hasNext();) {
+					KerningPair pair = (KerningPair)iter.next();
+					if (pair.firstCodePoint == glyph.getCodePoint()) {
+						kerningsJson.addChild(String.valueOf(pair.secondCodePoint), new JsonValue(pair.offset));
+					}
+				}
+				if (kerningsJson.child != null) {
+					glyphJson.addChild("k", kerningsJson);
+				}
 			}
 			pageIndex++;
 		}

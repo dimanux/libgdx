@@ -814,7 +814,7 @@ public class Hiero extends JFrame {
 			buttonGroup.add(freeTypeRadio);
 			buttonGroup.add(javaRadio);
 			buttonGroup.add(nativeRadio);
-			freeTypeRadio.setSelected(true);
+			javaRadio.setSelected(true);
 		}
 		{
 			JPanel samplePanel = new JPanel();
