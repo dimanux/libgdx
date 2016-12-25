@@ -543,7 +543,8 @@ public class TexturePacker {
 		public boolean grid;
 		public float[] scale = {1};
 		public String[] scaleSuffix = {""};
-		public String[] ignore = {};
+		public String[] ignore = null;
+		public String[] include = null;
 
 		public Settings () {
 		}
@@ -585,6 +586,7 @@ public class TexturePacker {
 			scale = settings.scale;
 			scaleSuffix = settings.scaleSuffix;
 			ignore = settings.ignore;
+			include = settings.include;
 		}
 
 		public String getScaledPackFileName (String packFileName, int scaleIndex) {

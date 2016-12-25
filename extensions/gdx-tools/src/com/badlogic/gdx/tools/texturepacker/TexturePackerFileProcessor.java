@@ -211,9 +211,11 @@ public class TexturePackerFileProcessor extends FileProcessor {
 		// Pack.
 		if (!settings.silent) System.out.println(inputDir.inputFile.getName());
 		TexturePacker packer = new TexturePacker(root, settings);
-		ArrayList<String> ignoreList = new ArrayList<String>(Arrays.asList(settings.ignore));
+		ArrayList<String> includeList = (settings.include != null ? new ArrayList<String>(Arrays.asList(settings.include)) : null);
+		ArrayList<String> ignoreList = (settings.ignore != null ? new ArrayList<String>(Arrays.asList(settings.ignore)) : null);
 		for (Entry file : files) {
-			if (!ignoreList.contains(file.inputFile.getName())) {
+			if (((includeList == null) || includeList.contains(file.inputFile.getName())) &&
+				((ignoreList == null) || !ignoreList.contains(file.inputFile.getName()))) {
 				packer.addImage(file.inputFile);
 			}
 		}
