@@ -70,7 +70,6 @@ public class AudioSprite {
 		AudioFormat format = null;
 		ArrayList<AudioInputStream> inStreams = new ArrayList<AudioInputStream>();
 		float offset = 0.0f;
-		AudioInputStream silenceStream = null;
 		JsonValue fileJson = new JsonValue(ValueType.object);
 		JsonValue pageJson = new JsonValue(ValueType.object);
 		fileJson.addChild(outputFile.getName(), pageJson);
@@ -79,8 +78,8 @@ public class AudioSprite {
 				AudioInputStream inStream = AudioSystem.getAudioInputStream(file.inputFile);
 				if (format == null) {
 					format = inStream.getFormat();
-					silenceStream = new AudioInputStream(new ByteArrayInputStream(new byte[(int) (format.getFrameSize() * format.getFrameRate() * silenceDuration)]), format, (long) (format.getFrameRate() * silenceDuration));
 				}
+				AudioInputStream silenceStream = new AudioInputStream(new ByteArrayInputStream(new byte[(int) (format.getFrameSize() * format.getFrameRate() * silenceDuration)]), format, (long) (format.getFrameRate() * silenceDuration));
 				if (!format.matches(inStream.getFormat()))
 				{
 					inStream = AudioSystem.getAudioInputStream(format, inStream);
