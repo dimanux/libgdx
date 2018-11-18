@@ -69,7 +69,7 @@ public class Stage extends InputAdapter implements Disposable {
 	private Viewport viewport;
 	private final Batch batch;
 	private boolean ownsBatch;
-	private final Group root;
+	private Group root;
 	private final Vector2 tempCoords = new Vector2();
 	private final Actor[] pointerOverActors = new Actor[20];
 	private final boolean[] pointerTouched = new boolean[20];
@@ -123,12 +123,10 @@ public class Stage extends InputAdapter implements Disposable {
 		if (!root.isVisible()) return;
 
 		Batch batch = this.batch;
-		if (batch != null) {
-			batch.setProjectionMatrix(camera.combined);
-			batch.begin();
-			root.draw(batch, 1);
-			batch.end();
-		}
+		batch.setProjectionMatrix(camera.combined);
+		batch.begin();
+		root.draw(batch, 1);
+		batch.end();
 
 		if (debug) drawDebug();
 	}
@@ -259,9 +257,7 @@ public class Stage extends InputAdapter implements Disposable {
 	/** Applies a touch down event to the stage and returns true if an actor in the scene {@link Event#handle() handled} the
 	 * event. */
 	public boolean touchDown (int screenX, int screenY, int pointer, int button) {
-		if (screenX < viewport.getScreenX() || screenX >= viewport.getScreenX() + viewport.getScreenWidth()) return false;
-		if (Gdx.graphics.getHeight() - screenY < viewport.getScreenY()
-			|| Gdx.graphics.getHeight() - screenY >= viewport.getScreenY() + viewport.getScreenHeight()) return false;
+		if (!isInsideViewport(screenX, screenY)) return false;
 
 		pointerTouched[pointer] = true;
 		pointerScreenX[pointer] = screenX;
@@ -280,9 +276,8 @@ public class Stage extends InputAdapter implements Disposable {
 		Actor target = hit(tempCoords.x, tempCoords.y, true);
 		if (target == null) {
 			if (root.getTouchable() == Touchable.enabled) root.fire(event);
-		} else {
+		} else
 			target.fire(event);
-		}
 
 		boolean handled = event.isHandled();
 		Pools.free(event);
@@ -365,12 +360,10 @@ public class Stage extends InputAdapter implements Disposable {
 	/** Applies a mouse moved event to the stage and returns true if an actor in the scene {@link Event#handle() handled} the
 	 * event. This event only occurs on the desktop. */
 	public boolean mouseMoved (int screenX, int screenY) {
-		if (screenX < viewport.getScreenX() || screenX >= viewport.getScreenX() + viewport.getScreenWidth()) return false;
-		if (Gdx.graphics.getHeight() - screenY < viewport.getScreenY()
-			|| Gdx.graphics.getHeight() - screenY >= viewport.getScreenY() + viewport.getScreenHeight()) return false;
-
 		mouseScreenX = screenX;
 		mouseScreenY = screenY;
+
+		if (!isInsideViewport(screenX, screenY)) return false;
 
 		screenToStageCoordinates(tempCoords.set(screenX, screenY));
 
@@ -626,7 +619,7 @@ public class Stage extends InputAdapter implements Disposable {
 				event.setRelatedActor(oldKeyboardFocus);
 				actor.fire(event);
 				success = !event.isCancelled();
-				if (!success) setKeyboardFocus(oldKeyboardFocus);
+				if (!success) keyboardFocus = oldKeyboardFocus;
 			}
 		}
 		Pools.free(event);
@@ -661,7 +654,7 @@ public class Stage extends InputAdapter implements Disposable {
 				event.setRelatedActor(oldScrollFocus);
 				actor.fire(event);
 				success = !event.isCancelled();
-				if (!success) setScrollFocus(oldScrollFocus);
+				if (!success) scrollFocus = oldScrollFocus;
 			}
 		}
 		Pools.free(event);
@@ -704,6 +697,12 @@ public class Stage extends InputAdapter implements Disposable {
 	/** Returns the root group which holds all actors in the stage. */
 	public Group getRoot () {
 		return root;
+	}
+
+	/** Replaces the root group. Usually this is not necessary but a subclass may be desired in some cases, eg being notified of
+	 * {@link Group#childrenChanged()}. */
+	public void setRoot (Group root) {
+		this.root = root;
 	}
 
 	/** Returns the {@link Actor} at the specified location in stage coordinates. Hit testing is performed in the order the actors
@@ -782,6 +781,10 @@ public class Stage extends InputAdapter implements Disposable {
 			root.setDebug(false, true);
 	}
 
+	public boolean isDebugAll () {
+		return debugAll;
+	}
+
 	/** If true, debug is enabled only for the actor under the mouse. Can be combined with {@link #setDebugAll(boolean)}. */
 	public void setDebugUnderMouse (boolean debugUnderMouse) {
 		if (this.debugUnderMouse == debugUnderMouse) return;
@@ -825,6 +828,16 @@ public class Stage extends InputAdapter implements Disposable {
 	public void dispose () {
 		clear();
 		if (ownsBatch) batch.dispose();
+	}
+
+	/** Check if screen coordinates are inside the viewport's screen area. */
+	protected boolean isInsideViewport (int screenX, int screenY) {
+		int x0 = viewport.getScreenX();
+		int x1 = x0 + viewport.getScreenWidth();
+		int y0 = viewport.getScreenY();
+		int y1 = y0 + viewport.getScreenHeight();
+		screenY = Gdx.graphics.getHeight() - 1 - screenY;
+		return screenX >= x0 && screenX < x1 && screenY >= y0 && screenY < y1;
 	}
 
 	/** Internal class for managing touch focus. Public only for GWT.

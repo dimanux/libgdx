@@ -25,7 +25,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Debug;
 import android.os.Handler;
-import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
@@ -34,11 +33,11 @@ import android.widget.FrameLayout;
 
 import com.badlogic.gdx.Application;
 import com.badlogic.gdx.ApplicationListener;
+import com.badlogic.gdx.ApplicationLogger;
 import com.badlogic.gdx.Audio;
 import com.badlogic.gdx.Files;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Graphics;
-import com.badlogic.gdx.Input;
 import com.badlogic.gdx.LifecycleListener;
 import com.badlogic.gdx.Net;
 import com.badlogic.gdx.Preferences;
@@ -50,7 +49,6 @@ import com.badlogic.gdx.utils.GdxRuntimeException;
 import com.badlogic.gdx.utils.SnapshotArray;
 
 import java.lang.reflect.Method;
-import java.util.Arrays;
 
 /** An implementation of the {@link Application} interface for Android. Create an {@link Activity} that derives from this class. In
  * the {@link Activity#onCreate(Bundle)} method call the {@link #initialize(ApplicationListener)} method specifying the
@@ -76,6 +74,7 @@ public class AndroidApplication extends Activity implements AndroidApplicationBa
 	protected final SnapshotArray<LifecycleListener> lifecycleListeners = new SnapshotArray<LifecycleListener>(LifecycleListener.class);
 	private final Array<AndroidEventListener> androidEventListeners = new Array<AndroidEventListener>();
 	protected int logLevel = LOG_INFO;
+	protected ApplicationLogger applicationLogger;
 	protected boolean useImmersiveMode = false;
 	protected boolean hideStatusBar = false;
 	private int wasFocusChanged = -1;
@@ -132,6 +131,7 @@ public class AndroidApplication extends Activity implements AndroidApplicationBa
 		if (this.getVersion() < MINIMUM_SDK) {
 			throw new GdxRuntimeException("LibGDX requires Android API Level " + MINIMUM_SDK + " or later.");
 		}
+		setApplicationLogger(new AndroidApplicationLogger());
 		graphics = new AndroidGraphics(this, config, config.resolutionStrategy == null ? new FillResolutionStrategy()
 			: config.resolutionStrategy);
 		input = AndroidInputFactory.newAndroidInput(this, this, graphics.view, config);
@@ -195,6 +195,10 @@ public class AndroidApplication extends Activity implements AndroidApplicationBa
 				log("AndroidApplication", "Failed to create AndroidVisibilityListener", e);
 			}
 		}
+		
+		// detect an already connected bluetooth keyboardAvailable
+		if (getResources().getConfiguration().keyboard != Configuration.KEYBOARD_NOKEYS)
+			this.getInput().keyboardAvailable = true;
 	}
 
 	protected FrameLayout.LayoutParams createLayoutParams () {
@@ -406,36 +410,32 @@ public class AndroidApplication extends Activity implements AndroidApplicationBa
 
 	@Override
 	public void debug (String tag, String message) {
-		if (logLevel >= LOG_DEBUG) {
-			Log.d(tag, message);
-		}
+		if (logLevel >= LOG_DEBUG) getApplicationLogger().debug(tag, message);
 	}
 
 	@Override
 	public void debug (String tag, String message, Throwable exception) {
-		if (logLevel >= LOG_DEBUG) {
-			Log.d(tag, message, exception);
-		}
+		if (logLevel >= LOG_DEBUG) getApplicationLogger().debug(tag, message, exception);
 	}
 
 	@Override
 	public void log (String tag, String message) {
-		if (logLevel >= LOG_INFO) Log.i(tag, message);
+		if (logLevel >= LOG_INFO) getApplicationLogger().log(tag, message);
 	}
 
 	@Override
 	public void log (String tag, String message, Throwable exception) {
-		if (logLevel >= LOG_INFO) Log.i(tag, message, exception);
+		if (logLevel >= LOG_INFO) getApplicationLogger().log(tag, message, exception);
 	}
 
 	@Override
 	public void error (String tag, String message) {
-		if (logLevel >= LOG_ERROR) Log.e(tag, message);
+		if (logLevel >= LOG_ERROR) getApplicationLogger().error(tag, message);
 	}
 
 	@Override
 	public void error (String tag, String message, Throwable exception) {
-		if (logLevel >= LOG_ERROR) Log.e(tag, message, exception);
+		if (logLevel >= LOG_ERROR) getApplicationLogger().error(tag, message, exception);
 	}
 
 	@Override
@@ -446,6 +446,16 @@ public class AndroidApplication extends Activity implements AndroidApplicationBa
 	@Override
 	public int getLogLevel () {
 		return logLevel;
+	}
+
+	@Override
+	public void setApplicationLogger (ApplicationLogger applicationLogger) {
+		this.applicationLogger = applicationLogger;
+	}
+
+	@Override
+	public ApplicationLogger getApplicationLogger () {
+		return applicationLogger;
 	}
 
 	@Override

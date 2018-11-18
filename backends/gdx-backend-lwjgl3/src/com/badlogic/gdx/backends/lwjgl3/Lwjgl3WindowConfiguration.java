@@ -16,6 +16,10 @@
 
 package com.badlogic.gdx.backends.lwjgl3;
 
+import java.util.Arrays;
+
+import com.badlogic.gdx.Files.FileType;
+import com.badlogic.gdx.Graphics;
 import com.badlogic.gdx.Graphics.DisplayMode;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Graphics.Lwjgl3DisplayMode;
 import com.badlogic.gdx.graphics.Color;
@@ -28,11 +32,40 @@ public class Lwjgl3WindowConfiguration {
 	int windowMinWidth = -1, windowMinHeight = -1, windowMaxWidth = -1, windowMaxHeight = -1;
 	boolean windowResizable = true;
 	boolean windowDecorated = true;
+	boolean windowMaximized = false;
+	boolean autoIconify = false;
+	FileType windowIconFileType;
+	String[] windowIconPaths;
 	Lwjgl3WindowListener windowListener;
 	Lwjgl3DisplayMode fullscreenMode;
 	String title = "";
 	Color initialBackgroundColor = Color.BLACK;
 	boolean initialVisible = true;
+	boolean vSyncEnabled = true;
+
+	void setWindowConfiguration (Lwjgl3WindowConfiguration config){
+		windowX = config.windowX;
+		windowY = config.windowY;
+		windowWidth = config.windowWidth;
+		windowHeight = config.windowHeight;
+		windowMinWidth = config.windowMinWidth;
+		windowMinHeight = config.windowMinHeight;
+		windowMaxWidth = config.windowMaxWidth;
+		windowMaxHeight = config.windowMaxHeight;
+		windowResizable = config.windowResizable;
+		windowDecorated = config.windowDecorated;
+		windowMaximized = config.windowMaximized;
+		autoIconify = config.autoIconify;
+		windowIconFileType = config.windowIconFileType;
+		if (config.windowIconPaths != null) 
+			windowIconPaths = Arrays.copyOf(config.windowIconPaths, config.windowIconPaths.length);
+		windowListener = config.windowListener;
+		fullscreenMode = config.fullscreenMode;
+		title = config.title;
+		initialBackgroundColor = config.initialBackgroundColor;
+		initialVisible = config.initialVisible;
+		vSyncEnabled = config.vSyncEnabled;
+	}
 	
 	/**
 	 * @param visibility whether the window will be visible on creation. (default true)
@@ -55,7 +88,7 @@ public class Lwjgl3WindowConfiguration {
 	}
 	
 	/** 
-	 * @param resizable whether the windowed mode window is resizable
+	 * @param resizable whether the windowed mode window is resizable (default true)
 	 */
 	public void setResizable(boolean resizable) {
 		this.windowResizable = resizable;
@@ -68,6 +101,21 @@ public class Lwjgl3WindowConfiguration {
 		this.windowDecorated = decorated;
 	}
 	
+	/**
+	 * @param maximized whether the window starts maximized. Ignored if the window is full screen. (default false)
+	 */
+	public void setMaximized(boolean maximized) {
+		this.windowMaximized = maximized;
+	}
+
+	/**
+	 * @param autoIconify whether the window should automatically iconify and restore previous video mode on input focus loss. (default false)
+	 *                    Does nothing in windowed mode.
+	 */
+	public void setAutoIconify (boolean autoIconify) {
+		this.autoIconify = autoIconify;
+	}
+
 	/**
 	 * Sets the position of the window in windowed mode on the
 	 * primary monitor. Default -1 for both coordinates for centered.
@@ -86,6 +134,26 @@ public class Lwjgl3WindowConfiguration {
 		windowMinHeight = minHeight;
 		windowMaxWidth = maxWidth;
 		windowMaxHeight = maxHeight;
+	}
+	
+	/**
+	 * Sets the icon that will be used in the window's title bar. Has no effect in macOS, which doesn't use window icons.
+	 * @param filePaths One or more {@linkplain FileType#Internal internal} image paths. Must be JPEG, PNG, or BMP format.
+	 * The one closest to the system's desired size will be scaled. Good sizes include 16x16, 32x32 and 48x48.
+	 */
+	public void setWindowIcon (String... filePaths) {
+		setWindowIcon(FileType.Internal, filePaths);
+	}
+	
+	/**
+	 * Sets the icon that will be used in the window's title bar. Has no effect in macOS, which doesn't use window icons.
+	 * @param fileType The type of file handle the paths are relative to.
+	 * @param filePaths One or more image paths, relative to the given {@linkplain FileType}. Must be JPEG, PNG, or BMP format. 
+	 * The one closest to the system's desired size will be scaled. Good sizes include 16x16, 32x32 and 48x48.
+	 */
+	public void setWindowIcon (FileType fileType, String... filePaths) {
+		windowIconFileType = fileType;
+		windowIconPaths = filePaths;
 	}
 	
 	/**
@@ -117,5 +185,17 @@ public class Lwjgl3WindowConfiguration {
 	 */
 	public void setInitialBackgroundColor(Color color) {
 		initialBackgroundColor = color;
+	}
+
+	/**
+	 * Sets whether to use vsync. This setting can be changed anytime at runtime
+	 * via {@link Graphics#setVSync(boolean)}.
+	 *
+	 * For multi-window applications, only one (the main) window should enable vsync.
+	 * Otherwise, every window will wait for the vertical blank on swap individually,
+	 * effectively cutting the frame rate to (refreshRate / numberOfWindows).
+	 */
+	public void useVsync(boolean vsync) {
+		this.vSyncEnabled = vsync;
 	}
 }

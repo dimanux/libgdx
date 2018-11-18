@@ -40,7 +40,7 @@ public class DragAndDrop {
 	ObjectMap<Source, DragListener> sourceListeners = new ObjectMap();
 	private float tapSquareSize = 8;
 	private int button;
-	float dragActorX = 14, dragActorY = -20;
+	float dragActorX = 0, dragActorY = 0;
 	float touchOffsetX, touchOffsetY;
 	long dragStartTime;
 	int dragTime = 250;
@@ -71,10 +71,9 @@ public class DragAndDrop {
 
 				Stage stage = event.getStage();
 
-				Touchable dragActorTouchable = null;
 				if (dragActor != null) {
-					dragActorTouchable = dragActor.getTouchable();
-					dragActor.setTouchable(Touchable.disabled);
+					dragActor.remove(); // Remove so it cannot be hit (Touchable.disabled isn't enough).
+					dragActor = null;
 				}
 
 				// Find target.
@@ -100,20 +99,15 @@ public class DragAndDrop {
 				// Notify new target of drag.
 				if (newTarget != null) isValidTarget = newTarget.drag(source, payload, tmpVector.x, tmpVector.y, pointer);
 
-				if (dragActor != null) dragActor.setTouchable(dragActorTouchable);
-
-				// Add/remove and position the drag actor.
+				// Add and position the drag actor.
 				Actor actor = null;
 				if (target != null) actor = isValidTarget ? payload.validDragActor : payload.invalidDragActor;
 				if (actor == null) actor = payload.dragActor;
+				dragActor = actor;
 				if (actor == null) return;
-				if (dragActor != actor) {
-					if (dragActor != null) dragActor.remove();
-					dragActor = actor;
-					stage.addActor(actor);
-				}
-				float actorX = event.getStageX() + dragActorX;
-				float actorY = event.getStageY() + dragActorY - actor.getHeight();
+				stage.addActor(actor);
+				float actorX = event.getStageX() - actor.getWidth() + dragActorX;
+				float actorY = event.getStageY() + dragActorY;
 				if (keepWithinStage) {
 					if (actorX < 0) actorX = 0;
 					if (actorY < 0) actorY = 0;
@@ -199,6 +193,11 @@ public class DragAndDrop {
 	/** Returns the current drag actor, or null. */
 	public Actor getDragActor () {
 		return dragActor;
+	}
+
+	/** Returns the current drag payload, or null. */
+	public Payload getDragPayload () {
+		return payload;
 	}
 
 	/** Time in milliseconds that a drag must take before a drop will be considered valid. This ignores an accidental drag and drop

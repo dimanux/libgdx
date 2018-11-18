@@ -6,6 +6,7 @@
 		<include name="Application.java"/>
 		<include name="ApplicationAdapter.java"/>
 		<include name="ApplicationListener.java"/>
+		<include name="ApplicationLogger.java"/>
 		<include name="Audio.java"/>
 		<include name="Files.java"/>
 		<include name="Game.java"/>
@@ -42,6 +43,7 @@
 		<include name="assets/loaders/MusicLoader.java"/>
 		<include name="assets/loaders/ParticleEffectLoader.java"/>
 		<include name="assets/loaders/PixmapLoader.java"/>
+		<include name="assets/loaders/ShaderProgramLoader.java"/>
 		<include name="assets/loaders/SkinLoader.java"/>
 		<include name="assets/loaders/SoundLoader.java"/>
 		<include name="assets/loaders/SynchronousAssetLoader.java"/>
@@ -93,6 +95,7 @@
 	<!-- graphics/g2d -->
 		<include name="graphics/g2d/Animation.java"/>
 		<include name="graphics/g2d/Batch.java"/>
+		<include name="graphics/g2d/PolygonBatch.java"/>
 		<include name="graphics/g2d/BitmapFont.java"/>
 		<include name="graphics/g2d/BitmapFontCache.java"/>
 		<include name="graphics/g2d/CpuSpriteBatch.java"/>
@@ -109,6 +112,7 @@
 		<include name="graphics/g2d/PolygonRegion.java"/>
 		<include name="graphics/g2d/PolygonRegionLoader.java"/>
 		<include name="graphics/g2d/PolygonSprite.java"/>
+		<include name="graphics/g2d/RepeatablePolygonSprite.java"/>
 		<include name="graphics/g2d/PolygonSpriteBatch.java"/>
 		<include name="graphics/g2d/Sprite.java"/>
 		<include name="graphics/g2d/SpriteBatch.java"/>
@@ -262,8 +266,9 @@
 		<include name="graphics/glutils/VertexData.java"/>
 
 	<!-- graphics/profiling -->
-		<include name="graphics/profiling/GL20Profiler.java"/>
-		<include name="graphics/profiling/GL30Profiler.java"/>
+		<include name="graphics/profiling/GL20Interceptor.java"/>
+		<include name="graphics/profiling/GL30Interceptor.java"/>
+		<include name="graphics/profiling/GLInterceptor.java"/>
 		<include name="graphics/profiling/GLProfiler.java"/>
 		<include name="graphics/profiling/GLErrorListener.java"/> <!-- Emulated -->
 						
@@ -276,6 +281,7 @@
 		<include name="maps/ImageResolver.java"/>
 		<include name="maps/Map.java"/>
 		<include name="maps/MapLayer.java"/>
+		<include name="maps/MapGroupLayer.java"/>
 		<include name="maps/MapLayers.java"/>
 		<include name="maps/MapObject.java"/>
 		<include name="maps/MapObjects.java"/>

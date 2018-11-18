@@ -16,8 +16,7 @@
 
 package com.badlogic.gdx.graphics.g2d;
 
-import static com.badlogic.gdx.graphics.g2d.Sprite.SPRITE_SIZE;
-import static com.badlogic.gdx.graphics.g2d.Sprite.VERTEX_SIZE;
+import static com.badlogic.gdx.graphics.g2d.Sprite.*;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
@@ -57,7 +56,7 @@ import com.badlogic.gdx.utils.NumberUtils;
  * @author mzechner
  * @author Stefan Bachmann
  * @author Nathan Sweet */
-public class PolygonSpriteBatch implements Batch {
+public class PolygonSpriteBatch implements PolygonBatch {
 	private Mesh mesh;
 
 	private final float[] vertices;
@@ -74,13 +73,15 @@ public class PolygonSpriteBatch implements Batch {
 	private boolean blendingDisabled;
 	private int blendSrcFunc = GL20.GL_SRC_ALPHA;
 	private int blendDstFunc = GL20.GL_ONE_MINUS_SRC_ALPHA;
+	private int blendSrcFuncAlpha = GL20.GL_SRC_ALPHA;
+	private int blendDstFuncAlpha = GL20.GL_ONE_MINUS_SRC_ALPHA;
 
 	private final ShaderProgram shader;
 	private ShaderProgram customShader;
 	private boolean ownsShader;
 
-	float color = Color.WHITE.toFloatBits();
-	private Color tempColor = new Color(1, 1, 1, 1);
+	private final Color color = new Color(1, 1, 1, 1);
+	float colorPacked = Color.WHITE_FLOAT_BITS;
 
 	/** Number of render calls since the last {@link #begin()}. **/
 	public int renderCalls = 0;
@@ -91,16 +92,24 @@ public class PolygonSpriteBatch implements Batch {
 	/** The maximum number of triangles rendered in one batch so far. **/
 	public int maxTrianglesInBatch = 0;
 
-	/** Constructs a new PolygonSpriteBatch with a size of 2000, the default shader, and one buffer.
-	 * @see PolygonSpriteBatch#PolygonSpriteBatch(int, ShaderProgram) */
+	/** Constructs a PolygonSpriteBatch with the default shader, 2000 vertices, and 4000 triangles.
+	 * @see #PolygonSpriteBatch(int, int, ShaderProgram) */
 	public PolygonSpriteBatch () {
 		this(2000, null);
 	}
 
-	/** Constructs a PolygonSpriteBatch with the default shader and one buffer.
-	 * @see PolygonSpriteBatch#PolygonSpriteBatch(int, ShaderProgram) */
+	/** Constructs a PolygonSpriteBatch with the default shader, size vertices, and size * 2 triangles.
+	 * @param size The max number of vertices and number of triangles in a single batch. Max of 32767.
+	 * @see #PolygonSpriteBatch(int, int, ShaderProgram) */
 	public PolygonSpriteBatch (int size) {
-		this(size, null);
+		this(size, size * 2, null);
+	}
+
+	/** Constructs a PolygonSpriteBatch with the specified shader, size vertices and size * 2 triangles.
+	 * @param size The max number of vertices and number of triangles in a single batch. Max of 32767.
+	 * @see #PolygonSpriteBatch(int, int, ShaderProgram) */
+	public PolygonSpriteBatch (int size, ShaderProgram defaultShader) {
+		this(size, size * 2, defaultShader);
 	}
 
 	/** Constructs a new PolygonSpriteBatch. Sets the projection matrix to an orthographic projection with y-axis point upwards,
@@ -109,24 +118,26 @@ public class PolygonSpriteBatch implements Batch {
 	 * <p>
 	 * The defaultShader specifies the shader to use. Note that the names for uniforms for this default shader are different than
 	 * the ones expect for shaders set with {@link #setShader(ShaderProgram)}. See {@link SpriteBatch#createDefaultShader()}.
-	 * @param size The max number of vertices and number of triangles in a single batch. Max of 10920.
-	 * @param defaultShader The default shader to use. This is not owned by the PolygonSpriteBatch and must be disposed
-	 *           separately. */
-	public PolygonSpriteBatch (int size, ShaderProgram defaultShader) {
-		// 32767 is max index, so 32767 / 3 - (32767 / 3 % 3) = 10920.
-		if (size > 10920) throw new IllegalArgumentException("Can't have more than 10920 triangles per batch: " + size);
+	 * @param maxVertices The max number of vertices in a single batch. Max of 32767.
+	 * @param maxTriangles The max number of triangles in a single batch.
+	 * @param defaultShader The default shader to use. This is not owned by the PolygonSpriteBatch and must be disposed separately.
+	 *           May be null to use the default shader. */
+	public PolygonSpriteBatch (int maxVertices, int maxTriangles, ShaderProgram defaultShader) {
+		// 32767 is max vertex index.
+		if (maxVertices > 32767)
+			throw new IllegalArgumentException("Can't have more than 32767 vertices per batch: " + maxVertices);
 
 		Mesh.VertexDataType vertexDataType = Mesh.VertexDataType.VertexArray;
 		if (Gdx.gl30 != null) {
 			vertexDataType = VertexDataType.VertexBufferObjectWithVAO;
 		}
-		mesh = new Mesh(vertexDataType, false, size, size * 3,
+		mesh = new Mesh(vertexDataType, false, maxVertices, maxTriangles * 3,
 			new VertexAttribute(Usage.Position, 2, ShaderProgram.POSITION_ATTRIBUTE),
 			new VertexAttribute(Usage.ColorPacked, 4, ShaderProgram.COLOR_ATTRIBUTE),
 			new VertexAttribute(Usage.TextureCoordinates, 2, ShaderProgram.TEXCOORD_ATTRIBUTE + "0"));
 
-		vertices = new float[size * VERTEX_SIZE];
-		triangles = new short[size * 3];
+		vertices = new float[maxVertices * VERTEX_SIZE];
+		triangles = new short[maxTriangles * 3];
 
 		if (defaultShader == null) {
 			shader = SpriteBatch.createDefaultShader();
@@ -171,37 +182,33 @@ public class PolygonSpriteBatch implements Batch {
 
 	@Override
 	public void setColor (Color tint) {
-		color = tint.toFloatBits();
+		color.set(tint);
+		colorPacked = tint.toFloatBits();
 	}
 
 	@Override
 	public void setColor (float r, float g, float b, float a) {
-		int intBits = (int)(255 * a) << 24 | (int)(255 * b) << 16 | (int)(255 * g) << 8 | (int)(255 * r);
-		color = NumberUtils.intToFloatColor(intBits);
+		color.set(r, g, b, a);
+		colorPacked = color.toFloatBits();
 	}
 
 	@Override
-	public void setColor (float color) {
-		this.color = color;
+	public void setPackedColor (float packedColor) {
+		Color.abgr8888ToColor(color, packedColor);
+		colorPacked = packedColor;
 	}
 
 	@Override
 	public Color getColor () {
-		int intBits = NumberUtils.floatToIntColor(color);
-		Color color = this.tempColor;
-		color.r = (intBits & 0xff) / 255f;
-		color.g = ((intBits >>> 8) & 0xff) / 255f;
-		color.b = ((intBits >>> 16) & 0xff) / 255f;
-		color.a = ((intBits >>> 24) & 0xff) / 255f;
 		return color;
 	}
 
 	@Override
 	public float getPackedColor () {
-		return color;
+		return colorPacked;
 	}
 
-	/** Draws a polygon region with the bottom left corner at x,y having the width and height of the region. */
+	@Override
 	public void draw (PolygonRegion region, float x, float y) {
 		if (!drawing) throw new IllegalStateException("PolygonSpriteBatch.begin must be called before draw.");
 
@@ -226,7 +233,7 @@ public class PolygonSpriteBatch implements Batch {
 		this.triangleIndex = triangleIndex;
 
 		final float[] vertices = this.vertices;
-		final float color = this.color;
+		final float color = this.colorPacked;
 		final float[] textureCoords = region.textureCoords;
 
 		for (int i = 0; i < regionVerticesLength; i += 2) {
@@ -239,7 +246,7 @@ public class PolygonSpriteBatch implements Batch {
 		this.vertexIndex = vertexIndex;
 	}
 
-	/** Draws a polygon region with the bottom left corner at x,y and stretching the region to cover the given width and height. */
+	@Override
 	public void draw (PolygonRegion region, float x, float y, float width, float height) {
 		if (!drawing) throw new IllegalStateException("PolygonSpriteBatch.begin must be called before draw.");
 
@@ -265,7 +272,7 @@ public class PolygonSpriteBatch implements Batch {
 		this.triangleIndex = triangleIndex;
 
 		final float[] vertices = this.vertices;
-		final float color = this.color;
+		final float color = this.colorPacked;
 		final float[] textureCoords = region.textureCoords;
 		final float sX = width / textureRegion.regionWidth;
 		final float sY = height / textureRegion.regionHeight;
@@ -280,10 +287,7 @@ public class PolygonSpriteBatch implements Batch {
 		this.vertexIndex = vertexIndex;
 	}
 
-	/** Draws the polygon region with the bottom left corner at x,y and stretching the region to cover the given width and height.
-	 * The polygon region is offset by originX, originY relative to the origin. Scale specifies the scaling factor by which the
-	 * polygon region should be scaled around originX, originY. Rotation specifies the angle of counter clockwise rotation of the
-	 * rectangle around originX, originY. */
+	@Override
 	public void draw (PolygonRegion region, float x, float y, float originX, float originY, float width, float height,
 		float scaleX, float scaleY, float rotation) {
 		if (!drawing) throw new IllegalStateException("PolygonSpriteBatch.begin must be called before draw.");
@@ -310,7 +314,7 @@ public class PolygonSpriteBatch implements Batch {
 		this.triangleIndex = triangleIndex;
 
 		final float[] vertices = this.vertices;
-		final float color = this.color;
+		final float color = this.colorPacked;
 		final float[] textureCoords = region.textureCoords;
 
 		final float worldOriginX = x + originX;
@@ -333,8 +337,7 @@ public class PolygonSpriteBatch implements Batch {
 		this.vertexIndex = vertexIndex;
 	}
 
-	/** Draws the polygon using the given vertices and triangles. Each vertices must be made up of 5 elements in this order: x, y,
-	 * color, u, v. */
+	@Override
 	public void draw (Texture texture, float[] polygonVertices, int verticesOffset, int verticesCount, short[] polygonTriangles,
 		int trianglesOffset, int trianglesCount) {
 		if (!drawing) throw new IllegalStateException("PolygonSpriteBatch.begin must be called before draw.");
@@ -473,7 +476,7 @@ public class PolygonSpriteBatch implements Batch {
 			v2 = tmp;
 		}
 
-		float color = this.color;
+		float color = this.colorPacked;
 		int idx = this.vertexIndex;
 		vertices[idx++] = x1;
 		vertices[idx++] = y1;
@@ -543,7 +546,7 @@ public class PolygonSpriteBatch implements Batch {
 			v2 = tmp;
 		}
 
-		float color = this.color;
+		float color = this.colorPacked;
 		int idx = this.vertexIndex;
 		vertices[idx++] = x;
 		vertices[idx++] = y;
@@ -600,7 +603,7 @@ public class PolygonSpriteBatch implements Batch {
 		final float fx2 = x + srcWidth;
 		final float fy2 = y + srcHeight;
 
-		float color = this.color;
+		float color = this.colorPacked;
 		int idx = this.vertexIndex;
 		vertices[idx++] = x;
 		vertices[idx++] = y;
@@ -653,7 +656,7 @@ public class PolygonSpriteBatch implements Batch {
 		final float fx2 = x + width;
 		final float fy2 = y + height;
 
-		float color = this.color;
+		float color = this.colorPacked;
 		int idx = this.vertexIndex;
 		vertices[idx++] = x;
 		vertices[idx++] = y;
@@ -715,7 +718,7 @@ public class PolygonSpriteBatch implements Batch {
 		final float u2 = 1;
 		final float v2 = 0;
 
-		float color = this.color;
+		float color = this.colorPacked;
 		int idx = this.vertexIndex;
 		vertices[idx++] = x;
 		vertices[idx++] = y;
@@ -808,7 +811,7 @@ public class PolygonSpriteBatch implements Batch {
 		final float u2 = region.u2;
 		final float v2 = region.v;
 
-		float color = this.color;
+		float color = this.colorPacked;
 		int idx = this.vertexIndex;
 		vertices[idx++] = x;
 		vertices[idx++] = y;
@@ -939,7 +942,7 @@ public class PolygonSpriteBatch implements Batch {
 		final float u2 = region.u2;
 		final float v2 = region.v;
 
-		float color = this.color;
+		float color = this.colorPacked;
 		int idx = this.vertexIndex;
 		vertices[idx++] = x1;
 		vertices[idx++] = y1;
@@ -1086,7 +1089,7 @@ public class PolygonSpriteBatch implements Batch {
 			v4 = region.v2;
 		}
 
-		float color = this.color;
+		float color = this.colorPacked;
 		int idx = this.vertexIndex;
 		vertices[idx++] = x1;
 		vertices[idx++] = y1;
@@ -1152,7 +1155,7 @@ public class PolygonSpriteBatch implements Batch {
 		float u2 = region.u2;
 		float v2 = region.v;
 
-		float color = this.color;
+		float color = this.colorPacked;
 		int idx = vertexIndex;
 		vertices[idx++] = x1;
 		vertices[idx++] = y1;
@@ -1193,12 +1196,11 @@ public class PolygonSpriteBatch implements Batch {
 		Mesh mesh = this.mesh;
 		mesh.setVertices(vertices, 0, vertexIndex);
 		mesh.setIndices(triangles, 0, triangleIndex);
-
 		if (blendingDisabled) {
 			Gdx.gl.glDisable(GL20.GL_BLEND);
 		} else {
 			Gdx.gl.glEnable(GL20.GL_BLEND);
-			if (blendSrcFunc != -1) Gdx.gl.glBlendFunc(blendSrcFunc, blendDstFunc);
+			if (blendSrcFunc != -1) Gdx.gl.glBlendFuncSeparate(blendSrcFunc, blendDstFunc, blendSrcFuncAlpha, blendDstFuncAlpha);
 		}
 
 		mesh.render(customShader != null ? customShader : shader, GL20.GL_TRIANGLES, 0, trianglesInBatch);
@@ -1221,10 +1223,17 @@ public class PolygonSpriteBatch implements Batch {
 
 	@Override
 	public void setBlendFunction (int srcFunc, int dstFunc) {
-		if (blendSrcFunc == srcFunc && blendDstFunc == dstFunc) return;
+		setBlendFunctionSeparate(srcFunc, dstFunc, srcFunc, dstFunc);
+	}
+
+	@Override
+	public void setBlendFunctionSeparate(int srcFuncColor, int dstFuncColor, int srcFuncAlpha, int dstFuncAlpha) {
+		if (blendSrcFunc == srcFuncColor && blendDstFunc == dstFuncColor && blendSrcFuncAlpha == srcFuncAlpha && blendDstFuncAlpha == dstFuncAlpha) return;
 		flush();
-		blendSrcFunc = srcFunc;
-		blendDstFunc = dstFunc;
+		blendSrcFunc = srcFuncColor;
+		blendDstFunc = dstFuncColor;
+		blendSrcFuncAlpha = srcFuncAlpha;
+		blendDstFuncAlpha = dstFuncAlpha;
 	}
 
 	@Override
@@ -1235,6 +1244,16 @@ public class PolygonSpriteBatch implements Batch {
 	@Override
 	public int getBlendDstFunc () {
 		return blendDstFunc;
+	}
+
+	@Override
+	public int getBlendSrcFuncAlpha() {
+		return blendSrcFuncAlpha;
+	}
+
+	@Override
+	public int getBlendDstFuncAlpha() {
+		return blendDstFuncAlpha;
 	}
 
 	@Override

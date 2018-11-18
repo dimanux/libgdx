@@ -16,9 +16,6 @@
 
 package com.badlogic.gdx.tests.gwt;
 
-import java.util.Arrays;
-import java.util.Comparator;
-
 import com.badlogic.gdx.Application;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
@@ -63,6 +60,7 @@ import com.badlogic.gdx.tests.FilterPerformanceTest;
 import com.badlogic.gdx.tests.FrameBufferTest;
 import com.badlogic.gdx.tests.FramebufferToTextureTest;
 import com.badlogic.gdx.tests.GLProfilerErrorTest;
+import com.badlogic.gdx.tests.GWTLossyPremultipliedAlphaTest;
 import com.badlogic.gdx.tests.GestureDetectorTest;
 import com.badlogic.gdx.tests.GroupCullingTest;
 import com.badlogic.gdx.tests.GroupFadeTest;
@@ -86,6 +84,7 @@ import com.badlogic.gdx.tests.ParallaxTest;
 import com.badlogic.gdx.tests.ParticleEmitterTest;
 import com.badlogic.gdx.tests.PixelsPerInchTest;
 import com.badlogic.gdx.tests.ProjectiveTextureTest;
+import com.badlogic.gdx.tests.ReflectionCorrectnessTest;
 import com.badlogic.gdx.tests.ReflectionTest;
 import com.badlogic.gdx.tests.RotationTest;
 import com.badlogic.gdx.tests.ShapeRendererTest;
@@ -107,10 +106,15 @@ import com.badlogic.gdx.tests.UITest;
 import com.badlogic.gdx.tests.VertexBufferObjectShaderTest;
 import com.badlogic.gdx.tests.YDownTest;
 import com.badlogic.gdx.tests.conformance.DisplayModeTest;
+import com.badlogic.gdx.tests.extensions.ControllersTest;
 import com.badlogic.gdx.tests.g3d.ModelCacheTest;
 import com.badlogic.gdx.tests.g3d.ShadowMappingTest;
+import com.badlogic.gdx.tests.net.OpenBrowserExample;
 import com.badlogic.gdx.tests.superkoalio.SuperKoalio;
 import com.badlogic.gdx.tests.utils.GdxTest;
+
+import java.util.Arrays;
+import java.util.Comparator;
 
 public class GwtTestWrapper extends GdxTest {
 	Stage ui;
@@ -317,6 +321,16 @@ public class GwtTestWrapper extends GdxTest {
 		@Override
 		public boolean isTouched (int pointer) {
 			return input.isTouched(pointer);
+		}
+
+		@Override
+		public float getPressure () {
+			return input.getPressure();
+		}
+
+		@Override
+		public float getPressure (int pointer) {
+			return input.getPressure(pointer);
 		}
 
 		@Override
@@ -529,6 +543,10 @@ public class GwtTestWrapper extends GdxTest {
 		}
 	}, new Instancer() {
 		public GdxTest instance () {
+			return new ControllersTest();
+		}
+	}, new Instancer() {
+		public GdxTest instance () {
 			return new CustomShaderSpriteBatchTest();
 		}
 	}, new Instancer() {
@@ -645,6 +663,11 @@ public class GwtTestWrapper extends GdxTest {
 			}
 		}, new Instancer() {
 			public GdxTest instance () {
+				return new OpenBrowserExample();
+			}
+//		}, new Instancer() { public GdxTest instance () { return new NoncontinuousRenderingTest(); } // FIXME doesn't compile due to the use of Thread
+		}, new Instancer() {
+			public GdxTest instance () {
 				return new ParallaxTest();
 			}
 		}, new Instancer() {
@@ -664,6 +687,10 @@ public class GwtTestWrapper extends GdxTest {
 		}, new Instancer() {
 			public GdxTest instance () {
 				return new RotationTest();
+			}
+		}, new Instancer() {
+			public GdxTest instance () {
+				return new ReflectionCorrectnessTest();
 			}
 		},
 // new Instancer() {public GdxTest instance(){return new RunnablePostTest();}}, // Goes into infinite loop
@@ -758,6 +785,10 @@ public class GwtTestWrapper extends GdxTest {
 		}, new Instancer() {
 			public GdxTest instance () {
 				return new TimeUtilsTest();
+			}
+		}, new Instancer() {
+			public GdxTest instance() {
+				return new GWTLossyPremultipliedAlphaTest();
 			}
 		}};
 }

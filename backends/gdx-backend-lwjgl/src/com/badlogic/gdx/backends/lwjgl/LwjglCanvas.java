@@ -20,9 +20,12 @@ import java.awt.Canvas;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.EventQueue;
+import java.awt.geom.AffineTransform;
+
 import java.util.HashMap;
 import java.util.Map;
 
+import com.badlogic.gdx.ApplicationLogger;
 import org.lwjgl.opengl.AWTGLCanvas;
 import org.lwjgl.opengl.Display;
 
@@ -61,7 +64,9 @@ public class LwjglCanvas implements Application {
 	final Array<LifecycleListener> lifecycleListeners = new Array<LifecycleListener>();
 	boolean running = true;
 	int logLevel = LOG_INFO;
+	ApplicationLogger applicationLogger;
 	Cursor cursor;
+	float scaleX, scaleY;
 
 	public LwjglCanvas (ApplicationListener listener) {
 		LwjglApplicationConfiguration config = new LwjglApplicationConfiguration();
@@ -74,12 +79,17 @@ public class LwjglCanvas implements Application {
 
 	private void initialize (ApplicationListener listener, LwjglApplicationConfiguration config) {
 		LwjglNativesLoader.load();
-
+		setApplicationLogger(new LwjglApplicationLogger());
 		canvas = new Canvas() {
 			private final Dimension minSize = new Dimension(1, 1);
 
 			public final void addNotify () {
 				super.addNotify();
+
+				AffineTransform transform = getGraphicsConfiguration().getDefaultTransform();
+				scaleX = (float)transform.getScaleX();
+				scaleY = (float)transform.getScaleY();
+
 				if (SharedLibraryLoader.isMac) {
 					EventQueue.invokeLater(new Runnable() {
 						public void run () {
@@ -97,6 +107,14 @@ public class LwjglCanvas implements Application {
 
 			public Dimension getMinimumSize () {
 				return minSize;
+			}
+
+			public int getWidth () {
+				return Math.round(super.getWidth() * scaleX);
+			}
+
+			public int getHeight () {
+				return Math.round(super.getHeight() * scaleY);
 			}
 		};
 		canvas.setSize(1, 1);
@@ -220,7 +238,8 @@ public class LwjglCanvas implements Application {
 					if (lastWidth != width || lastHeight != height) {
 						lastWidth = width;
 						lastHeight = height;
-						Gdx.gl.glViewport(0, 0, lastWidth, lastHeight);
+						Display.setLocation(0, 0);
+						Gdx.gl.glViewport(0, 0, width, height);
 						resize(width, height);
 						listener.resize(width, height);
 						shouldRender = true;
@@ -295,11 +314,6 @@ public class LwjglCanvas implements Application {
 			public void run () {
 				if (!running) return;
 				running = false;
-				try {
-					Display.destroy();
-					if (audio != null) audio.dispose();
-				} catch (Throwable ignored) {
-				}
 				Array<LifecycleListener> listeners = lifecycleListeners;
 				synchronized (listeners) {
 					for (LifecycleListener listener : listeners) {
@@ -309,6 +323,11 @@ public class LwjglCanvas implements Application {
 				}
 				listener.pause();
 				listener.dispose();
+				try {
+					Display.destroy();
+					if (audio != null) audio.dispose();
+				} catch (Throwable ignored) {
+				}
 			}
 		});
 	}
@@ -351,46 +370,32 @@ public class LwjglCanvas implements Application {
 
 	@Override
 	public void debug (String tag, String message) {
-		if (logLevel >= LOG_DEBUG) {
-			System.out.println(tag + ": " + message);
-		}
+		if (logLevel >= LOG_DEBUG) getApplicationLogger().debug(tag, message);
 	}
 
 	@Override
 	public void debug (String tag, String message, Throwable exception) {
-		if (logLevel >= LOG_DEBUG) {
-			System.out.println(tag + ": " + message);
-			exception.printStackTrace(System.out);
-		}
+		if (logLevel >= LOG_DEBUG) getApplicationLogger().debug(tag, message, exception);
 	}
 
+	@Override
 	public void log (String tag, String message) {
-		if (logLevel >= LOG_INFO) {
-			System.out.println(tag + ": " + message);
-		}
+		if (logLevel >= LOG_INFO) getApplicationLogger().log(tag, message);
 	}
 
 	@Override
 	public void log (String tag, String message, Throwable exception) {
-		if (logLevel >= LOG_INFO) {
-			System.out.println(tag + ": " + message);
-			exception.printStackTrace(System.out);
-		}
+		if (logLevel >= LOG_INFO) getApplicationLogger().log(tag, message, exception);
 	}
 
 	@Override
 	public void error (String tag, String message) {
-		if (logLevel >= LOG_ERROR) {
-			System.err.println(tag + ": " + message);
-		}
+		if (logLevel >= LOG_ERROR) getApplicationLogger().error(tag, message);
 	}
 
 	@Override
 	public void error (String tag, String message, Throwable exception) {
-		if (logLevel >= LOG_ERROR) {
-			System.err.println(tag + ": " + message);
-			exception.printStackTrace(System.err);
-		}
+		if (logLevel >= LOG_ERROR) getApplicationLogger().error(tag, message, exception);
 	}
 
 	@Override
@@ -401,6 +406,16 @@ public class LwjglCanvas implements Application {
 	@Override
 	public int getLogLevel () {
 		return logLevel;
+	}
+
+	@Override
+	public void setApplicationLogger (ApplicationLogger applicationLogger) {
+		this.applicationLogger = applicationLogger;
+	}
+
+	@Override
+	public ApplicationLogger getApplicationLogger () {
+		return applicationLogger;
 	}
 
 	@Override

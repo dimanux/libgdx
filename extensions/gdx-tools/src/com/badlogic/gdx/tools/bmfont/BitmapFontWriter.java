@@ -22,7 +22,6 @@ import com.badlogic.gdx.graphics.PixmapIO;
 import com.badlogic.gdx.graphics.g2d.BitmapFont.BitmapFontData;
 import com.badlogic.gdx.graphics.g2d.BitmapFont.Glyph;
 import com.badlogic.gdx.graphics.g2d.PixmapPacker.Page;
-import com.badlogic.gdx.tools.hiero.Hiero;
 import com.badlogic.gdx.utils.Array;
 
 /** A utility to output BitmapFontData to a FNT file. This can be useful for caching the result from TrueTypeFont, for faster load
@@ -30,7 +29,7 @@ import com.badlogic.gdx.utils.Array;
  * <p>
  * The font file format is from the AngelCodeFont BMFont tool.
  * <p>
- * Output is nearly identical to the FreeType settting in the {@link Hiero} tool. BitmapFontWriter gives more flexibility, eg
+ * Output is nearly identical to the FreeType settting in the Hiero tool {@Link com.badlogic.gdx.tools.hiero.Hiero}. BitmapFontWriter gives more flexibility, eg
  * borders and shadows can be used. Hiero is able to avoid outputting the same glyph image more than once if multiple character
  * codes have the exact same glyph.
  * @author mattdesl AKA davedes */
@@ -181,8 +180,8 @@ public class BitmapFontWriter {
 			.append(quote(info.italic ? 1 : 0)).append(" charset=\"").append(info.charset == null ? "" : info.charset)
 			.append("\" unicode=").append(quote(info.unicode ? 1 : 0)).append(" stretchH=").append(quote(info.stretchH))
 			.append(" smooth=").append(quote(info.smooth ? 1 : 0)).append(" aa=").append(quote(info.aa)).append(" padding=")
-			.append(xmlQuote).append(info.padding.up).append(",").append(info.padding.down).append(",").append(info.padding.left)
-			.append(",").append(info.padding.right).append(xmlQuote).append(" spacing=").append(xmlQuote)
+			.append(xmlQuote).append(info.padding.up).append(",").append(info.padding.right).append(",").append(info.padding.down)
+			.append(",").append(info.padding.left).append(xmlQuote).append(" spacing=").append(xmlQuote)
 			.append(info.spacing.horizontal).append(",").append(info.spacing.vertical).append(xmlQuote).append(xmlCloseSelf)
 			.append("\n");
 
@@ -229,10 +228,10 @@ public class BitmapFontWriter {
 			Glyph g = glyphs.get(i);
 			boolean empty = g.width == 0 || g.height == 0;
 			buf.append(xmlTab).append(xmlOpen).append("char id=").append(quote(String.format("%-6s", g.id), true)).append("x=")
-				.append(quote(String.format("%-5s", empty ? 0 : g.srcX - padLeft), true)).append("y=")
-				.append(quote(String.format("%-5s", empty ? 0 : g.srcY - padRight), true)).append("width=")
-				.append(quote(String.format("%-5s", empty ? 0 : g.width + padX), true)).append("height=")
-				.append(quote(String.format("%-5s", empty ? 0 : g.height + padY), true)).append("xoffset=")
+				.append(quote(String.format("%-5s", empty ? 0 : g.srcX), true)).append("y=")
+				.append(quote(String.format("%-5s", empty ? 0 : g.srcY), true)).append("width=")
+				.append(quote(String.format("%-5s", empty ? 0 : g.width), true)).append("height=")
+				.append(quote(String.format("%-5s", empty ? 0 : g.height), true)).append("xoffset=")
 				.append(quote(String.format("%-5s", g.xoffset - padLeft), true)).append("yoffset=")
 				.append(
 					quote(String.format("%-5s", fontData.flipped ? g.yoffset + padTop : -(g.height + (g.yoffset + padTop))), true))

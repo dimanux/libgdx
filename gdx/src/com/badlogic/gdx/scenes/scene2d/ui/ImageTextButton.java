@@ -32,7 +32,7 @@ import com.badlogic.gdx.utils.Scaling;
  * @author Nathan Sweet */
 public class ImageTextButton extends Button {
 	private final Image image;
-	private final Label label;
+	private Label label;
 	private ImageTextButtonStyle style;
 
 	public ImageTextButton (String text, Skin skin) {
@@ -83,7 +83,8 @@ public class ImageTextButton extends Button {
 		return style;
 	}
 
-	private void updateImage () {
+	/** Updates the Image with the appropriate Drawable from the style before it is drawn. */
+	protected void updateImage () {
 		Drawable drawable = null;
 		if (isDisabled() && style.imageDisabled != null)
 			drawable = style.imageDisabled;
@@ -121,6 +122,11 @@ public class ImageTextButton extends Button {
 
 	public Cell getImageCell () {
 		return getCell(image);
+	}
+
+	public void setLabel (Label label) {
+		getLabelCell().setActor(label);
+		this.label = label;
 	}
 
 	public Label getLabel () {

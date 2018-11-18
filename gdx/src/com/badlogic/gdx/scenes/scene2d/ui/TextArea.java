@@ -86,9 +86,9 @@ public class TextArea extends TextField {
 				x += glyphPositions[start];
 				int end = linesBreak.items[cursorLine * 2 + 1];
 				int i = start;
-				for (; i <= end; i++)
+				for (; i < end; i++)
 					if (glyphPositions[i] > x) break;
-				if (glyphPositions[i] - x <= x - glyphPositions[i - 1]) return i;
+				if (i > 0 && glyphPositions[i] - x <= x - glyphPositions[i - 1]) return i;
 				return Math.max(0, i - 1);
 			}
 		} else {
@@ -167,11 +167,16 @@ public class TextArea extends TextField {
 				cursorLine = line;
 			}
 		}
+		updateFirstLineShowing();	// fix for drag-selecting text out of the TextArea's bounds
 	}
 
 	/** Scroll the text area to show the line of the cursor **/
 	void showCursor () {
 		updateCurrentLine();
+		updateFirstLineShowing();
+	}
+	
+	void updateFirstLineShowing () {
 		if (cursorLine != firstLineShowing) {
 			int step = cursorLine >= firstLineShowing ? 1 : -1;
 			while (firstLineShowing > cursorLine || firstLineShowing + linesShowing - 1 < cursorLine) {

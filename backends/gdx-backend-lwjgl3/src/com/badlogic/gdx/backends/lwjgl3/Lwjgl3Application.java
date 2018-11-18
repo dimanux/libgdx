@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.PrintStream;
 import java.nio.IntBuffer;
 
+import com.badlogic.gdx.ApplicationLogger;
 import com.badlogic.gdx.graphics.glutils.GLVersion;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallback;
@@ -62,6 +63,7 @@ public class Lwjgl3Application implements Application {
 	private final ObjectMap<String, Preferences> preferences = new ObjectMap<String, Preferences>();
 	private final Lwjgl3Clipboard clipboard;
 	private int logLevel = LOG_INFO;
+	private ApplicationLogger applicationLogger;
 	private volatile boolean running = true;
 	private final Array<Runnable> runnables = new Array<Runnable>();
 	private final Array<Runnable> executedRunnables = new Array<Runnable>();	
@@ -75,6 +77,7 @@ public class Lwjgl3Application implements Application {
 			Lwjgl3NativesLoader.load();
 			errorCallback = GLFWErrorCallback.createPrint(System.err);
 			GLFW.glfwSetErrorCallback(errorCallback);
+			GLFW.glfwInitHint(GLFW.GLFW_JOYSTICK_HAT_BUTTONS, GLFW.GLFW_FALSE);
 			if (!GLFW.glfwInit()) {
 				throw new GdxRuntimeException("Unable to initialize GLFW");
 			}
@@ -83,6 +86,7 @@ public class Lwjgl3Application implements Application {
 
 	public Lwjgl3Application(ApplicationListener listener, Lwjgl3ApplicationConfiguration config) {
 		initializeGlfw();
+		setApplicationLogger(new Lwjgl3ApplicationLogger());
 		this.config = Lwjgl3ApplicationConfiguration.copy(config);
 		if (this.config.title == null) this.config.title = listener.getClass().getSimpleName();
 		Gdx.app = this;
@@ -124,26 +128,23 @@ public class Lwjgl3Application implements Application {
 				((OpenALAudio) audio).update();
 			}
 
+			boolean haveWindowsRendered = false;
 			closedWindows.clear();
 			for (Lwjgl3Window window : windows) {
-				Gdx.graphics = window.getGraphics();
-				Gdx.gl30 = window.getGraphics().getGL30();
-				Gdx.gl20 = Gdx.gl30 != null ? Gdx.gl30 : window.getGraphics().getGL20();
-				Gdx.gl = Gdx.gl30 != null ? Gdx.gl30 : Gdx.gl20;
-				Gdx.input = window.getInput();
-
-				GLFW.glfwMakeContextCurrent(window.getWindowHandle());
+				window.makeCurrent();
 				currentWindow = window;
 				synchronized (lifecycleListeners) {
-					window.update();
-				}				
+					haveWindowsRendered |= window.update();
+				}
 				if (window.shouldClose()) {
 					closedWindows.add(window);
-				}				
+				}
 			}
 			GLFW.glfwPollEvents();
 
+			boolean shouldRequestRendering;
 			synchronized (runnables) {
+				shouldRequestRendering = runnables.size > 0;
 				executedRunnables.clear();
 				executedRunnables.addAll(runnables);
 				runnables.clear();
@@ -151,7 +152,15 @@ public class Lwjgl3Application implements Application {
 			for (Runnable runnable : executedRunnables) {
 				runnable.run();
 			}
-
+			if (shouldRequestRendering){
+				// Must follow Runnables execution so changes done by Runnables are reflected
+				// in the following render.
+				for (Lwjgl3Window window : windows) {
+					if (!window.getGraphics().isContinuousRendering())
+						window.requestRendering();
+				}
+			}
+			
 			for (Lwjgl3Window closedWindow : closedWindows) {
 				if (windows.size == 1) {
 					// Lifecycle listener methods have to be called before ApplicationListener methods. The
@@ -167,6 +176,16 @@ public class Lwjgl3Application implements Application {
 				closedWindow.dispose();
 
 				windows.removeValue(closedWindow, false);
+			}
+
+			if (!haveWindowsRendered) {
+				// Sleep a few milliseconds in case no rendering was requested
+				// with continuous rendering disabled.
+				try {
+					Thread.sleep(1000 / config.idleFPS);
+				} catch (InterruptedException e) {
+					// ignore
+				}
 			}
 		}
 	}
@@ -190,8 +209,10 @@ public class Lwjgl3Application implements Application {
 			((OpenALAudio) audio).dispose();
 		}
 		errorCallback.free();
+		errorCallback = null;
 		if (glDebugCallback != null) {
 			glDebugCallback.free();
+			glDebugCallback = null;
 		}
 		GLFW.glfwTerminate();
 	}
@@ -227,48 +248,33 @@ public class Lwjgl3Application implements Application {
 	}
 
 	@Override
-	public void debug(String tag, String message) {
-		if (logLevel >= LOG_DEBUG) {
-			System.out.println(tag + ": " + message);
-		}
+	public void debug (String tag, String message) {
+		if (logLevel >= LOG_DEBUG) getApplicationLogger().debug(tag, message);
 	}
 
 	@Override
-	public void debug(String tag, String message, Throwable exception) {
-		if (logLevel >= LOG_DEBUG) {
-			System.out.println(tag + ": " + message);
-			exception.printStackTrace(System.out);
-		}
+	public void debug (String tag, String message, Throwable exception) {
+		if (logLevel >= LOG_DEBUG) getApplicationLogger().debug(tag, message, exception);
 	}
 
 	@Override
-	public void log(String tag, String message) {
-		if (logLevel >= LOG_INFO) {
-			System.out.println(tag + ": " + message);
-		}
+	public void log (String tag, String message) {
+		if (logLevel >= LOG_INFO) getApplicationLogger().log(tag, message);
 	}
 
 	@Override
-	public void log(String tag, String message, Throwable exception) {
-		if (logLevel >= LOG_INFO) {
-			System.out.println(tag + ": " + message);
-			exception.printStackTrace(System.out);
-		}
+	public void log (String tag, String message, Throwable exception) {
+		if (logLevel >= LOG_INFO) getApplicationLogger().log(tag, message, exception);
 	}
 
 	@Override
-	public void error(String tag, String message) {
-		if (logLevel >= LOG_ERROR) {
-			System.err.println(tag + ": " + message);
-		}
+	public void error (String tag, String message) {
+		if (logLevel >= LOG_ERROR) getApplicationLogger().error(tag, message);
 	}
 
 	@Override
-	public void error(String tag, String message, Throwable exception) {
-		if (logLevel >= LOG_ERROR) {
-			System.err.println(tag + ": " + message);
-			exception.printStackTrace(System.err);
-		}
+	public void error (String tag, String message, Throwable exception) {
+		if (logLevel >= LOG_ERROR) getApplicationLogger().error(tag, message, exception);
 	}
 
 	@Override
@@ -279,6 +285,16 @@ public class Lwjgl3Application implements Application {
 	@Override
 	public int getLogLevel() {
 		return logLevel;
+	}
+
+	@Override
+	public void setApplicationLogger (ApplicationLogger applicationLogger) {
+		this.applicationLogger = applicationLogger;
+	}
+
+	@Override
+	public ApplicationLogger getApplicationLogger () {
+		return applicationLogger;
 	}
 
 	@Override
@@ -346,36 +362,54 @@ public class Lwjgl3Application implements Application {
 	
 	/**
 	 * Creates a new {@link Lwjgl3Window} using the provided listener and {@link Lwjgl3WindowConfiguration}.
+	 *
+	 * This function only just instantiates a {@link Lwjgl3Window} and returns immediately. The actual window creation
+	 * is postponed with {@link Application#postRunnable(Runnable)} until after all existing windows are updated.
 	 */
 	public Lwjgl3Window newWindow(ApplicationListener listener, Lwjgl3WindowConfiguration config) {
 		Lwjgl3ApplicationConfiguration appConfig = Lwjgl3ApplicationConfiguration.copy(this.config);
-		appConfig.setWindowedMode(config.windowWidth, config.windowHeight);
-		appConfig.setWindowPosition(config.windowX, config.windowY);
-		appConfig.setWindowSizeLimits(config.windowMinWidth, config.windowMinHeight, config.windowMaxWidth, config.windowMaxHeight);
-		appConfig.setResizable(config.windowResizable);
-		appConfig.setDecorated(config.windowDecorated);
-		appConfig.setWindowListener(config.windowListener);
-		appConfig.setFullscreenMode(config.fullscreenMode);
-		appConfig.setTitle(config.title);
-		appConfig.setInitialBackgroundColor(config.initialBackgroundColor);
-		appConfig.setInitialVisible(config.initialVisible);
-		Lwjgl3Window window = createWindow(appConfig, listener, windows.get(0).getWindowHandle());
-		windows.add(window);
+		appConfig.setWindowConfiguration(config);
+		return createWindow(appConfig, listener, windows.get(0).getWindowHandle());
+	}
+
+	private Lwjgl3Window createWindow (final Lwjgl3ApplicationConfiguration config, ApplicationListener listener,
+		final long sharedContext) {
+		final Lwjgl3Window window = new Lwjgl3Window(listener, config);
+		if (sharedContext == 0) {
+			// the main window is created immediately
+			createWindow(window, config, sharedContext);
+		} else {
+			// creation of additional windows is deferred to avoid GL context trouble
+			postRunnable(new Runnable() {
+				public void run () {
+					createWindow(window, config, sharedContext);
+					windows.add(window);
+				}
+			});
+		}
 		return window;
 	}
 
-	private Lwjgl3Window createWindow(Lwjgl3ApplicationConfiguration config, ApplicationListener listener, long sharedContext) {
+	private void createWindow(Lwjgl3Window window, Lwjgl3ApplicationConfiguration config, long sharedContext) {
 		long windowHandle = createGlfwWindow(config, sharedContext);
-		Lwjgl3Window window = new Lwjgl3Window(windowHandle, listener, config);
+		window.create(windowHandle);
 		window.setVisible(config.initialVisible);
-		return window;
+
+		for (int i = 0; i < 2; i++) {
+			GL11.glClearColor(config.initialBackgroundColor.r, config.initialBackgroundColor.g, config.initialBackgroundColor.b,
+					config.initialBackgroundColor.a);
+			GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
+			GLFW.glfwSwapBuffers(windowHandle);
+		}
 	}
 
 	static long createGlfwWindow(Lwjgl3ApplicationConfiguration config, long sharedContextWindow) {
 		GLFW.glfwDefaultWindowHints();
 		GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE);
 		GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, config.windowResizable ? GLFW.GLFW_TRUE : GLFW.GLFW_FALSE);
-		
+		GLFW.glfwWindowHint(GLFW.GLFW_MAXIMIZED, config.windowMaximized ? GLFW.GLFW_TRUE : GLFW.GLFW_FALSE);
+		GLFW.glfwWindowHint(GLFW.GLFW_AUTO_ICONIFY, config.autoIconify ? GLFW.GLFW_TRUE : GLFW.GLFW_FALSE);
+
 		if(sharedContextWindow == 0) {
 			GLFW.glfwWindowHint(GLFW.GLFW_RED_BITS, config.r);
 			GLFW.glfwWindowHint(GLFW.GLFW_GREEN_BITS, config.g);
@@ -398,6 +432,10 @@ public class Lwjgl3Application implements Application {
 			}
 		}
 
+		if (config.transparentFramebuffer) {
+			GLFW.glfwWindowHint(GLFW.GLFW_TRANSPARENT_FRAMEBUFFER, GLFW.GLFW_TRUE);
+		}
+
 		if (config.debug) {
 			GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_DEBUG_CONTEXT, GLFW.GLFW_TRUE);
 		}
@@ -414,12 +452,8 @@ public class Lwjgl3Application implements Application {
 		if (windowHandle == 0) {
 			throw new GdxRuntimeException("Couldn't create window");
 		}
-		GLFW.glfwSetWindowSizeLimits(windowHandle, 
-			config.windowMinWidth > -1 ? config.windowMinWidth : GLFW.GLFW_DONT_CARE, 
-				config.windowMinHeight > -1 ? config.windowMinHeight : GLFW.GLFW_DONT_CARE, 
-					config.windowMaxWidth > -1 ? config.windowMaxWidth : GLFW.GLFW_DONT_CARE,
-						config.windowMaxHeight> -1 ? config.windowMaxHeight : GLFW.GLFW_DONT_CARE);
-		if (config.fullscreenMode == null) {
+		Lwjgl3Window.setSizeLimits(windowHandle, config.windowMinWidth, config.windowMinHeight, config.windowMaxWidth, config.windowMaxHeight);
+		if (config.fullscreenMode == null && !config.windowMaximized) {
 			if (config.windowX == -1 && config.windowY == -1) {
 				int windowWidth = Math.max(config.windowWidth, config.windowMinWidth);
 				int windowHeight = Math.max(config.windowHeight, config.windowMinHeight);
@@ -430,6 +464,9 @@ public class Lwjgl3Application implements Application {
 			} else {
 				GLFW.glfwSetWindowPos(windowHandle, config.windowX, config.windowY);
 			}
+		}
+		if (config.windowIconPaths != null) {
+			Lwjgl3Window.setIcon(windowHandle, config.windowIconPaths, config.windowIconFileType);
 		}
 		GLFW.glfwMakeContextCurrent(windowHandle);
 		GLFW.glfwSwapInterval(config.vSyncEnabled ? 1 : 0);
@@ -450,12 +487,6 @@ public class Lwjgl3Application implements Application {
 			setGLDebugMessageControl(GLDebugMessageSeverity.NOTIFICATION, false);
 		}
 
-		for (int i = 0; i < 2; i++) {
-			GL11.glClearColor(config.initialBackgroundColor.r, config.initialBackgroundColor.g, config.initialBackgroundColor.b,
-					config.initialBackgroundColor.a);
-			GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
-			GLFW.glfwSwapBuffers(windowHandle);
-		}
 		return windowHandle;
 	}
 

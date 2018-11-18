@@ -310,6 +310,16 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 			return false;
 	}
 
+	@Override
+	public float getPressure () {
+		return getPressure(0);
+	}
+
+	@Override
+	public float getPressure (int pointer) {
+		return isTouched(pointer) ? 1 : 0;
+	}
+
 	void processEvents () {
 		synchronized (this) {
 			justTouched = false;
@@ -380,7 +390,7 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 				}
 			}
 
-			if (touchEvents.size() == 0) {
+			if (touchEvents.isEmpty()) {
 				deltaX = 0;
 				deltaY = 0;
 			}
@@ -596,10 +606,6 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 
 	protected static int translateKeyCode (int keyCode) {
 		switch (keyCode) {
-		case java.awt.event.KeyEvent.VK_ADD:
-			return Input.Keys.PLUS;
-		case java.awt.event.KeyEvent.VK_SUBTRACT:
-			return Input.Keys.MINUS;
 		case java.awt.event.KeyEvent.VK_0:
 			return Input.Keys.NUM_0;
 		case java.awt.event.KeyEvent.VK_1:
@@ -699,6 +705,7 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 		case java.awt.event.KeyEvent.VK_PERIOD:
 			return Input.Keys.PERIOD;
 		case java.awt.event.KeyEvent.VK_PLUS:
+		case java.awt.event.KeyEvent.VK_ADD:
 			return Input.Keys.PLUS;
 		case java.awt.event.KeyEvent.VK_SEMICOLON:
 			return Input.Keys.SEMICOLON;
@@ -712,6 +719,13 @@ public class LwjglAWTInput implements Input, MouseMotionListener, MouseListener,
 			return Input.Keys.TAB;
 		case java.awt.event.KeyEvent.VK_BACK_SPACE:
 			return Input.Keys.DEL;
+		case java.awt.event.KeyEvent.VK_QUOTE:
+			return Input.Keys.APOSTROPHE;
+		case java.awt.event.KeyEvent.VK_ASTERISK:
+		case java.awt.event.KeyEvent.VK_MULTIPLY:
+			return Input.Keys.STAR;
+		case java.awt.event.KeyEvent.VK_SUBTRACT:
+			return Input.Keys.MINUS;
 		case java.awt.event.KeyEvent.VK_CONTROL:
 			return Input.Keys.CONTROL_LEFT;
 		case java.awt.event.KeyEvent.VK_ESCAPE:
